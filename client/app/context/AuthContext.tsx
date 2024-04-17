@@ -9,7 +9,8 @@ interface AuthProps {
     onLogout?: () => Promise<any>;
 };
 
-const TOKEN_KEY = '8cf16dc9ea404229a1e6ca8339534929952470c6a8e9fee7f568605eeca5ae3d';
+const TOKEN_KEY = 'token_key';
+const USER_ID = 'user_id'
 export const API_URL = 'http://10.0.2.2:8080/api';
 const AuthContext = createContext<AuthProps>({});
 
@@ -20,16 +21,16 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: any) => {
     const [authState, setAuthState] = useState<{
         token: string | null;
-        authenticated: boolean | null;
+        authenticated: boolean | false;
     }>({
         token: null,
-        authenticated: null
+        authenticated: false,
     });
 
     useEffect(() => {
         const loadToken = async () => {
             const token = await SecureStore.getItemAsync(TOKEN_KEY);
-            console.log("~ file: AuthContext.tsx:32 ~ loadToken ~ token:", token);
+            const user_id = await SecureStore.getItemAsync('USER_ID');
 
             if(token) {
                 axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -54,18 +55,14 @@ export const AuthProvider = ({ children }: any) => {
     const login = async (email: string, password: string) => {
         try {
             const result = await axios.post(`${API_URL}/auth/login`, { email, password });
-            console.log('Loading');
-
-            console.log("~ file: AuthContext.tsx:58 ~ login ~ result:", result);
 
             setAuthState({
                 token: result.data.token,
                 authenticated: true
             });
 
-            axios.defaults.headers.common['Authorization'] = `Bearer ${result.data.token}`;
-
             await SecureStore.setItemAsync(TOKEN_KEY, result.data.token);
+            await SecureStore.setItemAsync('USER_ID', JSON.stringify(result.data.details._id));
 
             return result;
         } catch (e) {
@@ -76,14 +73,12 @@ export const AuthProvider = ({ children }: any) => {
     const logout = async () => {
         // Delete token from storage
         await SecureStore.deleteItemAsync(TOKEN_KEY);
-
-        // Update HTTP Headers
-        axios.defaults.headers.common['Authorization'] = '';
+        await SecureStore.deleteItemAsync(USER_ID);
 
         // Reset auth state
         setAuthState({
             token: null,
-            authenticated: false
+            authenticated: false,
         });
     };
 
